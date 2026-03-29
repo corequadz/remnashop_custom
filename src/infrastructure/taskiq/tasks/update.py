@@ -5,7 +5,7 @@ import orjson
 from adaptix import Retort
 from dishka.integrations.taskiq import FromDishka, inject
 from loguru import logger
-from packaging.version import Version
+from packaging.version import InvalidVersion, Version
 from redis.asyncio import Redis
 
 from src.application.common import EventPublisher
@@ -47,8 +47,19 @@ async def check_bot_update(
             logger.error("Remote version tag not found in GitHub API response")
             return
 
-    lv = Version(local_version)
-    rv = Version(remote_version)
+    try:
+        lv = Version(local_version)
+    except InvalidVersion:
+        logger.debug(
+            f"Local build tag '{config.build.tag}' is not a release version, skipping update check"
+        )
+        return
+
+    try:
+        rv = Version(remote_version)
+    except InvalidVersion:
+        logger.warning(f"Remote release tag '{remote_version}' is invalid, skipping update check")
+        return
 
     if rv <= lv:
         status = "up to date" if rv == lv else "ahead of remote"
